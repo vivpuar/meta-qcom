@@ -4,7 +4,7 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=b0a8acd90d872086b279ead88af03369"
 
 SRC_URI = "git://github.com/qualcomm-linux/qcom-ptool.git;branch=main;protocol=https"
-SRCREV = "509133553f095292f2d9b691a29239d75d083392"
+SRCREV = "fcd46a8a7ba3190c29a390b150fa7c24636a9b3f"
 
 INHIBIT_DEFAULT_DEPS = "1"
 
