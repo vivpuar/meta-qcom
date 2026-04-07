@@ -161,3 +161,7 @@ FIT_DTB_COMPATIBLE[talos-evk+talos-evk-camx] = "qcom,qcs615-iot-camx"
 FIT_DTB_COMPATIBLE[talos-evk+talos-evk-camx+talos-el2] = "qcom,qcs615-iot-camx-el2kvm"
 FIT_DTB_COMPATIBLE[talos-evk+talos-evk-lvds-auo_g133han01] = "qcom,talos-evk-lvds-auo,g133han01"
 FIT_DTB_COMPATIBLE[talos-evk+talos-evk-lvds-auo_g133han01+talos-el2] = "qcom,talos-evk-lvds-auo,g133han01-el2kvm"
+
+FIT_DTB_COMPATIBLE[shikra-cqm-evk] = "qcom,shikra_cqm-itp"
+FIT_DTB_COMPATIBLE[shikra-cqs-evk] = "qcom,shikra_cqs-itp"
+FIT_DTB_COMPATIBLE[shikra-iqs-evk] = "qcom,shikra_iqs-itp"
