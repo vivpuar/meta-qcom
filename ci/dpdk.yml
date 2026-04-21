@@ -1,0 +1,7 @@
+header:
+  version: 14
+
+repos:
+  meta-dpdk:
+    branch: master
+    url: https://git.yoctoproject.org/meta-dpdk
