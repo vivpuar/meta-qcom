@@ -7,6 +7,7 @@ LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=2998c54c288b081076c9af987bdf4838"
 DEPENDS += "dtc-native"
 
 SRC_URI = "git://github.com/qualcomm-linux/qcom-dtb-metadata.git;branch=main;protocol=https;tag=v${PV}"
+SRC_URI:append = " file://0001-Add-support-for-Shikra-CQM-CQS-and-IQS-variants.patch"
 
 SRCREV = "bf60e31a7eebbf5f54b5af55d182f869716966c0"
 

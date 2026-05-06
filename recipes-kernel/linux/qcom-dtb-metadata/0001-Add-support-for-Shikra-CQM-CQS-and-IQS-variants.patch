@@ -1,0 +1,76 @@
+From bf59f67377cc72981dd155208e938f82ae3da902 Mon Sep 17 00:00:00 2001
+From: Vivek Puar <vpuar@qti.qualcomm.com>
+Date: Tue, 5 May 2026 19:54:03 +0530
+Subject: [PATCH] Add support for Shikra CQM, CQS and IQS variants
+
+Add msm-id entries for Shikra CQM, CQS and IQS.
+SoC variants in qcom-metadata.dts, and add corresponding FDT image
+entries and FIT configurations for shikra-cqm-evk, shikra-cqs-evk
+and shikra-iqs-evk boards in qcom-next-fitimage.its.
+
+Signed-off-by: Anurag Pateriya <apateriy@qti.qualcomm.com>
+
+Upstream-Status: Pending
+---
+ qcom-fitimage.its | 12 ++++++++++++
+ qcom-metadata.dts | 15 +++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/qcom-fitimage.its b/qcom-fitimage.its
+index 2eb41f6..4d6c1cb 100644
+--- a/qcom-fitimage.its
++++ b/qcom-fitimage.its
+@@ -116,5 +116,17 @@
+ 			compatible = "qcom,hamoa-evk";
+ 			fdt = "fdt-hamoa-iot-evk.dtb";
+ 		};
++                conf-14 {
++                        compatible = "qcom,shikra_cqm-itp";
++                        fdt = "fdt-shikra-cqm-evk.dtb";
++                };
++                conf-15 {
++                        compatible = "qcom,shikra_cqs-itp";
++                        fdt = "fdt-shikra-cqs-evk.dtb"
++                };
++                conf-16 {
++                        compatible = "qcom,shikra_iqs-itp";
++                        fdt = "fdt-shikra-iqs-evk.dtb"
++                };
+ 	};
+ };
+diff --git a/qcom-metadata.dts b/qcom-metadata.dts
+index 8cd12ad..450ef90 100644
+--- a/qcom-metadata.dts
++++ b/qcom-metadata.dts
+@@ -59,6 +59,17 @@
+ 		sa8775p {
+ 			msm-id = <0x00000216>;
+ 		};
++                shikra_cqm {
++                        msm-id = <0x000002f4>;
++                };
++
++                shikra_cqs {
++                        msm-id = <0x000002f6>;
++                };
++
++                shikra_iqs {
++                        msm-id = <0x000002f7>;
++                };
+ 	};
+ 
+ 	soc-sku {
+@@ -115,6 +126,10 @@
+ 			board-id = <0x00000020>;
+ 		};
+ 
++                itp {
++                        board-id = <0x00000033>;
++                };
++
+ 		mtp {
+ 			board-id = <0x00000008>;
+ 		};
+-- 
+2.34.1
+
