@@ -4,6 +4,8 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=b0a8acd90d872086b279ead88af03369"
 
 SRC_URI = "git://github.com/qualcomm-linux/qcom-ptool.git;branch=main;protocol=https"
+SRC_URI:append = " file://0001-shikra-initial-partition.conf.patch"
+
 SRCREV = "7b3365284e2c19f1457e335eb25d545e9a2c08a6"
 
 INHIBIT_DEFAULT_DEPS = "1"
