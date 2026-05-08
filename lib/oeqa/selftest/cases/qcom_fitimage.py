@@ -541,3 +541,279 @@ class QcomFitImageTests(OESelftestTestCase):
         self.assertGreaterEqual(conf_count, 2,
             "Expected at least 2 configuration entries in dumpimage output")
 
+
+class QcomFitImageIntegrationTests(OESelftestTestCase):
+    """Integration tests that build a real FIT image from the kernel recipe.
+
+    These tests validate that dtb-fit-image.bbclass, fit-dtb-compatible.inc
+    and QcomItsNodeRoot work together end-to-end to produce a FIT image that
+    the UEFI firmware will be able to parse at boot.
+
+    A real kernel build is triggered so that DTB files, the metadata blob and
+    the FIT binary are all produced by the same tooling as in production.
+    """
+
+    # Cache build vars across helper calls within the same test run.
+    _cached_bb_vars = None
+
+    # Metadata DTS node names we extract once (class-level cache).
+    _meta_nodes = None
+
+    # Suffixes allowed by the metadata-check blacklist
+    COMPAT_SKIP_PATTERNS = {"camx", "el2kvm", "staging"}
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _get_bb_vars(self):
+        """Retrieve bitbake variables needed by integration tests."""
+        if self.__class__._cached_bb_vars is None:
+            self.__class__._cached_bb_vars = get_bb_vars([
+                'DEPLOY_DIR_IMAGE',
+                'KERNEL_DEVICETREE',
+                'MACHINE',
+                'QCOM_DTB_DEFAULT',
+                'FIT_CONF_PREFIX',
+            ], 'virtual/kernel')
+        return self.__class__._cached_bb_vars
+
+    def _skip_unless_multi_dtb(self):
+        """Skip the test unless the current MACHINE uses multi-dtb mode."""
+        bb_vars = self._get_bb_vars()
+        if bb_vars.get('QCOM_DTB_DEFAULT', '') != 'multi-dtb':
+            self.skipTest(
+                "MACHINE %s does not use multi-dtb FIT "
+                "(QCOM_DTB_DEFAULT=%s)" %
+                (bb_vars.get('MACHINE', '?'),
+                 bb_vars.get('QCOM_DTB_DEFAULT', '?')))
+
+    def _build_and_locate_fit(self):
+        """Build virtual/kernel and return (its_path, fit_path, bb_vars).
+
+        The build is triggered once; subsequent calls within the same
+        oe-selftest invocation are essentially no-ops (sstate hit).
+        """
+        bb_vars = self._get_bb_vars()
+        deploy_dir = bb_vars['DEPLOY_DIR_IMAGE']
+
+        bitbake('virtual/kernel')
+
+        its_path = os.path.join(deploy_dir, 'qclinux-fit-image.its')
+        fit_path = os.path.join(deploy_dir, 'qclinuxfitImage')
+
+        return its_path, fit_path, bb_vars
+
+    @staticmethod
+    def _parse_its_file(its_path):
+        """Re-use the ITS parser from the unit-test class."""
+        return QcomFitImageTests._parse_its_file(its_path)
+
+    def _get_metadata_nodes(self, deploy_dir):
+        """Extract valid node names from qcom-metadata.
+
+        Decompiles the deployed qcom-metadata.dtb back to DTS using
+        dtc-native, then parses node names.  This mirrors what
+        check-fitimage-metadata.sh does.
+        """
+        if self.__class__._meta_nodes is not None:
+            return self.__class__._meta_nodes
+
+        meta_dtb = os.path.join(deploy_dir, 'qcom-metadata.dtb')
+        if not os.path.exists(meta_dtb):
+            return set()
+
+        # Use dtc-native to decompile the .dtb to DTS text
+        bitbake('dtc-native -c addto_recipe_sysroot')
+        dtc_vars = get_bb_vars(
+            ['RECIPE_SYSROOT_NATIVE', 'bindir'], 'dtc-native')
+        dtc = os.path.join(
+            dtc_vars['RECIPE_SYSROOT_NATIVE'], dtc_vars['bindir'], 'dtc')
+
+        result = runCmd(f"{dtc} -I dtb -O dts {meta_dtb}")
+
+        nodes = set()
+        for line in result.output.splitlines():
+            line = line.strip()
+            if not line.endswith('{'):
+                continue
+            if line.startswith('&'):
+                continue
+            name = line.split()[0].rstrip(':').rstrip('{').strip()
+            if name and name != '/' and name != 'description':
+                nodes.add(name)
+
+        self.__class__._meta_nodes = nodes
+        return nodes
+
+    def _setup_uboot_tools(self):
+        """Build u-boot-tools-native and return the bindir."""
+        bitbake('u-boot-tools-native -c addto_recipe_sysroot')
+        uboot_vars = get_bb_vars(
+            ['RECIPE_SYSROOT_NATIVE', 'bindir'], 'u-boot-tools-native')
+        return os.path.join(
+            uboot_vars['RECIPE_SYSROOT_NATIVE'], uboot_vars['bindir'])
+
+    # ==================================================================
+    # Integration tests
+    # ==================================================================
+
+    def test_fitimage_its_structure(self):
+        """Build virtual/kernel and validate the generated ITS structure.
+
+        Checks:
+          - ITS and FIT files exist in DEPLOY_DIR_IMAGE
+          - Every DTB from KERNEL_DEVICETREE has a corresponding image node
+          - qcom-metadata.dtb image node exists with type=qcom_metadata
+          - Every config has an fdt reference that exists in images
+          - qcom-metadata never appears in any configuration
+          - At least one configuration exists
+        """
+        self._skip_unless_multi_dtb()
+        its_path, fit_path, bb_vars = self._build_and_locate_fit()
+
+        self.assertExists(its_path,
+            "ITS file not found in DEPLOY_DIR_IMAGE")
+        self.assertExists(fit_path,
+            "FIT binary not found in DEPLOY_DIR_IMAGE")
+
+        parsed = self._parse_its_file(its_path)
+        images = parsed['images']
+        configs = parsed['configurations']
+
+        # Metadata image node must exist and have correct type
+        self.assertIn('fdt-qcom-metadata.dtb', images,
+            "Missing qcom-metadata.dtb image node")
+        self.assertEqual(images['fdt-qcom-metadata.dtb'].get('type'),
+            'qcom_metadata',
+            "Metadata image node has wrong type")
+
+        # Every DTB from KERNEL_DEVICETREE must have an image node
+        for dtb_path in bb_vars['KERNEL_DEVICETREE'].split():
+            fname = os.path.basename(dtb_path).replace(',', '_')
+            self.assertIn(f'fdt-{fname}', images,
+                f"DTB '{fname}' from KERNEL_DEVICETREE missing in images")
+
+        # Must have at least one configuration
+        self.assertGreater(len(configs), 0,
+            "No configuration nodes found in ITS")
+
+        # FDT linkage: every fdt ref in configs must name an existing image
+        for cname, cprops in configs.items():
+            fdt = cprops.get('fdt')
+            self.assertIsNotNone(fdt,
+                f"Config {cname} has no 'fdt' property")
+            refs = fdt if isinstance(fdt, list) else [fdt]
+            for ref in refs:
+                self.assertIn(ref, images,
+                    f"Config {cname}: fdt '{ref}' not in images")
+
+        # Metadata must never appear in any configuration
+        for cname, cprops in configs.items():
+            fdt = cprops.get('fdt', '')
+            refs = fdt if isinstance(fdt, list) else [fdt]
+            for ref in refs:
+                self.assertNotEqual(ref, 'fdt-qcom-metadata.dtb',
+                    f"Config {cname} references metadata DTB")
+
+    def test_fitimage_dumpimage(self):
+        """Verify the compiled FIT binary with dumpimage.
+
+        Checks:
+          - dumpimage can parse the FIT without errors
+          - All DTBs from KERNEL_DEVICETREE appear in the dump
+          - The metadata image node is listed
+          - Configuration sections are present
+        """
+        self._skip_unless_multi_dtb()
+        its_path, fit_path, bb_vars = self._build_and_locate_fit()
+        self.assertExists(fit_path)
+
+        bindir = self._setup_uboot_tools()
+        dumpimage = os.path.join(bindir, 'dumpimage')
+
+        result = runCmd(f"{dumpimage} -l {fit_path}")
+        out = result.output
+
+        # Metadata must appear
+        self.assertIn('fdt-qcom-metadata.dtb', out,
+            "Metadata node missing from dumpimage output")
+
+        # All KERNEL_DEVICETREE entries must appear
+        for dtb_path in bb_vars['KERNEL_DEVICETREE'].split():
+            fname = os.path.basename(dtb_path).replace(',', '_')
+            self.assertIn(f'fdt-{fname}', out,
+                f"DTB '{fname}' missing from dumpimage output")
+
+        # At least one configuration section must exist
+        self.assertGreater(out.count('Configuration'), 0,
+            "No configuration sections in dumpimage output")
+
+    def test_fitimage_compatible_metadata_validation(self):
+        """Cross-check compatible strings against qcom-metadata.dts.
+
+        Every dash-separated suffix in each compatible string must
+        either be a node name in the metadata DTS or be listed in
+        the skip patterns (camx, el2kvm).
+
+        This replicates the core check from check-fitimage-metadata.sh
+        without requiring dtc.
+        """
+        self._skip_unless_multi_dtb()
+        its_path, _, bb_vars = self._build_and_locate_fit()
+        self.assertExists(its_path)
+
+        parsed = self._parse_its_file(its_path)
+        meta_nodes = self._get_metadata_nodes(bb_vars['DEPLOY_DIR_IMAGE'])
+
+        # If we failed to load metadata nodes, fail loudly
+        self.assertGreater(len(meta_nodes), 0,
+            "Could not load any metadata nodes from qcom-metadata.dts")
+
+        for cname, cprops in parsed['configurations'].items():
+            compat = cprops.get('compatible', '')
+            if not compat:
+                continue
+
+            self.assertTrue(compat.startswith('qcom,'),
+                f"Config {cname}: compatible '{compat}' "
+                f"must start with 'qcom,'")
+
+            suffix_part = compat[len('qcom,'):]
+            for part in suffix_part.split('-'):
+                if not part:
+                    continue
+                if part in self.COMPAT_SKIP_PATTERNS:
+                    continue
+                self.assertIn(part, meta_nodes,
+                    f"Config {cname}: suffix '{part}' from "
+                    f"'{compat}' not found in metadata nodes "
+                    f"(and not in skip list)")
+
+    def test_fitimage_overlay_configs_fdt_list(self):
+        """Overlay configurations must have an fdt list, not a single fdt.
+
+        For any config whose fdt is a list, the first entry must be a
+        base .dtb and the remaining entries must be .dtbo overlays.
+        """
+        self._skip_unless_multi_dtb()
+        its_path, _, bb_vars = self._build_and_locate_fit()
+        self.assertExists(its_path)
+
+        parsed = self._parse_its_file(its_path)
+
+        for cname, cprops in parsed['configurations'].items():
+            fdt = cprops.get('fdt')
+            if isinstance(fdt, list):
+                self.assertTrue(fdt[0].endswith('.dtb'),
+                    f"Config {cname}: first fdt '{fdt[0]}' in overlay "
+                    f"list must be a .dtb")
+                for ovl in fdt[1:]:
+                    self.assertTrue(ovl.endswith('.dtbo'),
+                        f"Config {cname}: overlay fdt '{ovl}' must "
+                        f"be a .dtbo")
+            elif isinstance(fdt, str):
+                # Single-fdt configs must reference a .dtb, never a .dtbo
+                self.assertTrue(fdt.endswith('.dtb'),
+                    f"Config {cname}: standalone fdt '{fdt}' must "
+                    f"be a .dtb, not a .dtbo")
