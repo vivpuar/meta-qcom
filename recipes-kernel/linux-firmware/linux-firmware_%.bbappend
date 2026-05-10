@@ -3,6 +3,13 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 ALTERNATIVES_CLASS = ""
 ALTERNATIVES_CLASS:qcom = "update-alternatives"
 
+WHENCE_CHKSUM:qcom = "33379488c4af97ada35fb659b43c8916"
+PATCHTOOL:qcom = "git"
+
+SRC_URI:append:qcom = " \
+    file://0001-linux-firmware-qcom-add-Gen2-firmware-binary-for-Aga.patch \
+"
+
 inherit_defer ${ALTERNATIVES_CLASS}
 
 # firmware-ath6kl provides updated bdata.bin, which can not be accepted into main linux-firmware repo
