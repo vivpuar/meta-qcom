@@ -9,7 +9,6 @@ SRC_URI:append:qcom = " \
     file://workarounds/0001-PENDING-arm64-dts-qcom-Remove-voltage-vote-support-f.patch \
     file://monaco-evk-dts/0001-arm64-dts-qcom-monaco-evk-camera-Add-DT-overlay.patch \
     file://hamoa-iot-evk-dts/0001-arm64-dts-qcom-hamoa-iot-evk-camera-imx577-Add-DT-ov.patch \
-    file://generic-drivers/remoteproc/0001-FROMLIST-remoteproc-qcom-pas-Map-unmap-subsystem-reg.patch \
 "
 
 # Include additional kernel configs.
