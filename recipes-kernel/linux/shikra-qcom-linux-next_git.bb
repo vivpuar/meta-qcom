@@ -12,8 +12,8 @@ LINUX_VERSION ?= "7.0+7.1-rc1+shikra"
 
 PV = "${LINUX_VERSION}+git"
 
-# tag: qcom-linux-next-20260511
-SRCREV ?= "e614f53bd9266da271751b3f1563576173545d7f"
+# tag: qcom-linux-next-20260512
+SRCREV ?= "d8f9129e74b7d60bb89cbfeec18a807fb1e109bf"
 
 SRCBRANCH ?= "nobranch=1"
 
