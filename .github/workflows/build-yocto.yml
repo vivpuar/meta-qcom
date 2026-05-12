@@ -142,6 +142,11 @@ jobs:
           echo "KAS_CONTAINER=$KAS_CONTAINER" >> $GITHUB_ENV
           chmod +x $KAS_CONTAINER
 
+      - name: Setup cache variables (used by oe-selftest)
+        run: |
+          echo "DL_DIR=${CACHE_DIR}/downloads" >> $GITHUB_ENV
+          echo "SSTATE_DIR=${CACHE_DIR}/sstate-cache-$(date '+%Y-%m')" >> $GITHUB_ENV
+
       - name: Run Yocto patchreview
         run: |
           ci/kas-container-shell-helper.sh ci/yocto-patchreview.sh
@@ -149,6 +154,10 @@ jobs:
       - name: Run yocto-check-layer
         run: |
           ci/kas-container-shell-helper.sh ci/yocto-check-layer.sh
+
+      - name: Run oe-selftest
+        run: |
+          ci/kas-container-shell-helper.sh ci/oe-selftest.sh
 
   compile_warm_up:
     needs: [kas-setup, github-cache-check]
