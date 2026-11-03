@@ -10,7 +10,7 @@ PACKAGES = " \
 RRECOMMENDS:${PN}-firmware = " \
     ${@bb.utils.contains_any('DISTRO_FEATURES', 'opencl opengl vulkan', 'linux-firmware-qcom-adreno-g717 linux-firmware-qcom-eliza-adreno', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wifi', 'linux-firmware-ath12k-qcc2072', '', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'linux-firmware-qca-qcc2072', '', d)} \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'linux-firmware-qca-qcc2072 linux-firmware-qca-qca2066 linux-firmware-qca-wcn685x linux-firmware-qca-wcn7850', '', d)} \
     linux-firmware-qcom-eliza-audio \
     linux-firmware-qcom-eliza-compute \
     linux-firmware-qcom-vpu \
